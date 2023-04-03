@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Webcam Image Cropper</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.12/cropper.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.12/cropper.min.css">
+</head>
+<body>
+    <div>
+        <h1>Webcam Image Cropper</h1>
+        <video id="video" width="640" height="480" autoplay></video>
+        <br>
+        <button id="capture-btn">Capture</button>
+        <br>
+        <!--
+        <form action="" id="image-form">
+            {% csrf_token %}
+            {{form.as_p}}
+        </form>
+        -->
+        <button id="save-btn">Save</button>
+        <br>
+
+        <canvas id="canvas" width="640" height="480"></canvas>
+        <br>
+        <div>
+            <img id="image" src="" alt="Cropped Image">
+        </div>
+        
+    </div>
+    <script>
+        // Capture the webcam image
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const context = canvas.getContext('2d');
+
+        const capBtn = document.getElementById('capture-btn');
+
+
+        const csrf = document.getElementsByName('csrfmiddleware');
+        // 이거는 동영상을 가져와서 video라는 id Element에 넣어줍니다.
+        navigator.mediaDevices.getUserMedia({ video: true })
+            .then((stream) => {
+                video.srcObject = stream;
+            });
+        let cropper;
+        // capBtn에서 듣고 있어요 클릭을
+        capBtn.addEventListener('click', () => {
+            
+            context.drawImage(video, 0, 0, video.width, video.height);
+            // Crop the image using Cropper.js
+            cropper = new Cropper(canvas, {
+                aspectRatio: NaN,
+                viewMode: 1,
+                dragMode: 'crop',
+                movable:false,
+                scalable:false,
+                zoomable:false,
+                cropBoxResizable: true,
+                cropBoxMovable: true,
+
+                minCropBoxWidth: 100,
+                minCropBoxHeight: 100,
+                ready() {
+                    cropper.setCropBoxData({
+                        width: 200,
+                        height: 200,
+                    });
+                },
+                crop : function(event){
+                    console.log(event.detail)
+                }
+            });
+            // Save the cropped image to the img element
+            document.getElementById('image').src = cropper.getCroppedCanvas().toDataURL();
+            
+        });
+        // Save the cropped image to the server
+        document.getElementById('save-btn').addEventListener('click', () => {
+            console.log("실행되나")
+            const dataUrl = document.getElementById('image').src;
+            cropper.getCroppedCanvas().toBlob((blob)=>{
+                const fd = new FormData();
+                // 그냥
+                fd.append('name', "hello");
+                fd.append('file', blob, 'my-image.png')
+                
+                $.ajax({
+                    type: "POST",
+                    //url : dataUrl,
+                    enctype : 'multipart/form-data',
+                    data : fd,
+                    success: function () {
+                        alert('Image saved successfully!');
+                    },
+                    error: function () {
+                        alert('Failed to save image!');
+                    },
+
+                    /* 쓸데없는 설정*/
+                    cache:false,
+                    contentType:false,
+                    processData:false,
+                });
+            })
+            document.getElementsByClassName("cropper-container cropper-bg")[0].innerHTML="";
+
+            
+            
+        });
+    </script>
+</body>
+</html>
