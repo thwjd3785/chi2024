@@ -113,6 +113,8 @@ def detectme(request):
         print("에러입니다...")
         pass
 
+###############################
+
 from .forms import PhotoForm
 
 

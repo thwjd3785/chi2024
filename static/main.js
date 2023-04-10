@@ -7,7 +7,7 @@ navigator.mediaDevices.getUserMedia({ video: true })
         video.srcObject = "stream";
     });
 document.getElementById('capture-btn').addEventListener('click', () => {
-    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+    context.drawImage(video, 0, 0, 640, 480);
     // Crop the image using Cropper.js
     const cropper = new Cropper(canvas, {
         aspectRatio: 1 / 1,
