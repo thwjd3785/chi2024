@@ -28,14 +28,12 @@ import numpy as np
 from threading import Lock
 
 # 객체 인식 class 읽어오기
-classes = []
+# Load class names
 with open('detectme/coco.names', 'r') as f:
-    # text 파일 줄 별로 list화
     classes = [line.strip() for line in f.readlines()]
 
 model = torch.hub.load('ultralytics/yolov5', 'yolov5s', pretrained=True)
-colors = np.random.uniform(0,255, size=(len(classes),3))
-
+colors = np.random.uniform(0, 255, size=(len(classes), 3))
 
 # Create your views here.
 def home(request):

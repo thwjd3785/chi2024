@@ -1,6 +1,0 @@
-runtime: python310
-
-entrypoint: gunicorn -b :$PORT your_project_name.wsgi
-
-env_variables:
-  DJANGO_SETTINGS_MODULE: "Django.settings"
