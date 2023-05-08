@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Webcam Image Cropper</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.12/cropper.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.12/cropper.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.2/mqttws31.min.js"></script>
+    <style>
+        .container {
+            display: flex;
+            justify-content: space-around;
+        }
+        .webcam-container {
+            position: relative;
+            display: inline-block;
+        }
+        .section {
+            flex: 1;
+            padding: 20px;
+        }
+        .controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .inputs-container {
+            display: flex;
+            gap: 10px;
+        }
+        .image-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+
+        .image-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 10px;
+            border: 1px solid #ccc;
+        }
+
+        .block-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+
+        #canvas-wrapper {
+            width: 480px;
+            height: 360px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        #capture-btn {
+            background-color: #249e79; 
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 12px;
+            margin: 4px 2px;
+            cursor: pointer;
+            border-radius: 5px; /* Rounded corners */
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2); /* Subtle shadow effect */
+            transition: all 0.3s ease; /* Smooth transition for hover effects */
+        }
+
+        #blocking-btn {
+            background-color: #242424; /* Red */
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 12px;
+            margin: 4px 2px;
+            cursor: pointer;
+            border-radius: 5px; /* Rounded corners */
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2); /* Subtle shadow effect */
+            transition: all 0.3s ease; /* Smooth transition for hover effects */
+        }
+
+        #save-btn {
+            background-color: #249e79; /* Red */
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 12px;
+            margin: 4px 2px;
+            cursor: pointer;
+            border-radius: 5px; /* Rounded corners */
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2); /* Subtle shadow effect */
+            transition: all 0.3s ease; /* Smooth transition for hover effects */
+        }
+
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="webcam-container">
+            <h1>Webcam</h1>
+            <div class="controls">
+                <button id="capture-btn">센서 만들기</button>
+                <button id="blocking-btn">가릴 영역 만들기</button>
+            </div>
+            <img id="video" src="{% url 'detectme' %}" width="480" height="360" />
+        </div>
+        <div class="webcam-container">
+            <h1>Make New Sensor</h1>
+            <div class="controls">
+                <div id="inputs-container" class="inputs-container" style="display: none;">
+                    <input type="text" id="image-name" name="image-name" placeholder="Enter sensor name">
+                    <input type="text" id="object-name" name="object-name" placeholder="Enter object name">
+                </div>
+                <button id="save-btn" style="display:none;">Save</button>
+                <button id="modify-btn" style="display:none;">Modify</button>
+                <button id="create-blocking-btn" style="display:none;">Create Blocking Area</button>
+            </div>
+            <input type="hidden" id="x" name="x">
+            <input type="hidden" id="y" name="y">
+            <input type="hidden" id="w" name="w">
+            <input type="hidden" id="h" name="h">
+
+            <div id="canvas-wrapper">
+                <canvas id="canvas" width="480" height="360"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="section">
+        <h1>Saved Imagess</h1>
+        <button id="delete-selected-btn">Delete Selected</button>
+        <div id="image-list" class="image-list"></div>
+    </div>   
+    <div class="section">
+        <h1>Saved Blocks</h1>
+        <button id="delete-block-selected-btn">Delete Selected</button>
+        <div id="block-list" class="block-list"></div>
+    </div>  
+
+    <!-- Add your JavaScript code here -->
+    <script>
+        const canvas = document.getElementById('canvas');
+        const context = canvas.getContext('2d');
+        const capBtn = document.getElementById('capture-btn');
+
+        let cropper;
+        let sensorID;
+
+        capBtn.addEventListener('click', () => {
+            const video = document.getElementById('video');
+            context.drawImage(video, 0, 0, 480, 360);
+
+            initCropper(null);
+            // Save the cropped image to the img element
+            // document.getElementById('image').src = cropper.getCroppedCanvas().toDataURL();
+            document.getElementById('inputs-container').style.display = 'flex';
+            document.getElementById('save-btn').style.display = 'flex';
+        });
+
+        // Save the cropped image to the server
+        document.getElementById('save-btn').addEventListener('click', () => {
+            console.log("실행되나")
+            //const dataUrl = document.getElementById('image').src;
+            const imageName = document.getElementById('image-name').value;
+            const objectName = document.getElementById('object-name').value;
+            const cropData = cropper.getData();
+            const area = [cropData.x, cropData.y, cropData.width, cropData.height];
+            cropper.getCroppedCanvas().toBlob((blob) => {
+                const fd = new FormData();
+                fd.append('name', imageName);
+                fd.append('object_name', objectName);
+                fd.append('file', blob, 'my-image.png');
+                fd.append('x', parseInt(document.getElementById('x').value));
+                fd.append('y', parseInt(document.getElementById('y').value));
+                fd.append('w', parseInt(document.getElementById('w').value));
+                fd.append('h', parseInt(document.getElementById('h').value));
+
+
+                $.ajax({
+                    type: "POST",
+                    enctype: 'multipart/form-data',
+                    data: fd,
+
+                    success: function() {
+                        alert('Image saved successfully!');
+                        const objectName = document.getElementById('object-name').value;
+                        window.location.reload();
+                    },
+                    error: function() {
+                        alert('Failed to save image!');
+                        window.location.reload();
+                    },
+
+                    cache: false,
+                    contentType: false,
+                    processData: false,
+
+                });
+            });
+            displayImageList();
+            displayBlockList();
+        });     
+        displayImageList();
+        displayBlockList();
+        
+        document.getElementById('modify-btn').addEventListener('click', () => {
+            const imageName = document.getElementById('image-name').value;
+            const objectName = document.getElementById('object-name').value;
+
+            const cropData = cropper.getData();
+            const area = [cropData.x, cropData.y, cropData.width, cropData.height];
+            cropper.getCroppedCanvas().toBlob((blob) => {
+                const fd = new FormData();
+                fd.append('sensor_id', sensorID);
+                fd.append('name', imageName);
+                fd.append('object_name', objectName);
+                fd.append('file', blob, 'my-image.png');
+                fd.append('x', parseInt(document.getElementById('x').value));
+                fd.append('y', parseInt(document.getElementById('y').value));
+                fd.append('w', parseInt(document.getElementById('w').value));
+                fd.append('h', parseInt(document.getElementById('h').value));
+
+                $.ajax({
+                    type: "POST",
+                    url: '/update_sensor_data/',
+                    enctype: 'multipart/form-data',
+                    data: fd,
+                    success: function() {
+                        alert('Image data updated successfully!');
+                        window.location.reload();
+                    },
+                    error: function() {
+                        alert('Failed to update image data!');
+                        window.location.reload();
+                    },
+
+                    cache: false,
+                    contentType: false,
+                    processData: false,
+                });
+            });
+            document.getElementById('save-btn').style.display = 'none';
+        });
+
+
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    // Check if this cookie string begins with the name we want
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+
+        function initCropper(cropBoxData, position) {
+            if (cropper) {
+                cropper.destroy();
+            }
+
+            cropper = new Cropper(canvas, {
+                // ... other cropper options ...
+                aspectRatio: NaN,
+                viewMode: 1,
+                dragMode: 'crop',
+                movable: false,
+                scalable: false,
+                zoomable: false,
+                cropBoxResizable: true,
+                cropBoxMovable: true,
+                autoCropArea: false,
+                minCropBoxWidth: 50,
+                minCropBoxHeight: 50,
+                ready() {
+                    if (cropBoxData) {
+                        cropper.setCropBoxData(cropBoxData);
+                        cropper.setData(position); // Set the position
+                    } else {
+                        cropper.setCropBoxData({
+                            width: 200,
+                            height: 200,
+                        });
+                    }
+                },
+                crop: function (event) {
+                    const detail = event.detail;
+                    document.getElementById('x').value = detail.x;
+                    document.getElementById('y').value = detail.y;
+                    document.getElementById('w').value = detail.width;
+                    document.getElementById('h').value = detail.height;
+                },
+            });
+        }
+
+
+        function displayImageList() {
+            const csrftoken = getCookie('csrftoken');
+            $.ajax({
+                url: '/get_sensor_data/',
+                type: 'GET',
+                dataType: 'json',
+                headers: {
+                    'X-CSRFToken': csrftoken
+                },
+                success: (data) => {
+                    const parsedData = JSON.parse(data);
+                    const imageList = document.getElementById('image-list');
+                    imageList.innerHTML = '';
+
+                    parsedData.forEach((item) => {
+                        const imageItem = document.createElement('div');
+                        imageItem.className = 'image-item';
+
+                        const image = document.createElement('img');
+                        image.src = '/media/' + item.fields.file;
+                        image.width = 100;
+                        image.height = 100;
+
+                        const name = document.createElement('p');
+                        name.textContent = `Name: ${item.fields.name}`;
+
+                        const objectName = document.createElement('p');
+                        objectName.textContent = `Object: ${item.fields.object_name}`;
+
+                        imageItem.appendChild(image);
+                        imageItem.appendChild(name);
+                        imageItem.appendChild(objectName);
+
+                        // Add click event listener to the image item
+                        imageItem.addEventListener('click', () => {
+                            sensorID = item.pk
+                            document.getElementById('image-name').value = item.fields.name;
+                            document.getElementById('object-name').value = item.fields.object_name;
+                            document.getElementById('modify-btn').style.display = 'inline-block';
+                            document.getElementById('save-btn').style.display = 'none';
+
+                            // Re-crop the webcam image
+                            const video = document.getElementById('video');
+                            context.drawImage(video, 0, 0, 480, 360);
+
+                            initCropper({
+                                x: 0,
+                                y: 0,
+                                width: item.fields.w,
+                                height: item.fields.h,
+                            }, {
+                                x: item.fields.x,
+                                y: item.fields.y,
+                            });
+                            document.getElementById('inputs-container').style.display = 'flex';
+                        });
+
+                        imageList.appendChild(imageItem);
+
+                        // Add this in the forEach loop inside the displayImageList function
+                        const checkbox = document.createElement('input');
+                        checkbox.type = 'checkbox';
+                        checkbox.className = 'image-checkbox';
+                        checkbox.value = item.pk;
+
+                        imageItem.appendChild(checkbox);
+
+                    });
+                },
+
+                error: () => {
+                    console.log('Failed to fetch sensor data.');
+                }
+            });
+        }
+
+
+        function deleteSelectedImages(ids) {
+            const csrftoken = getCookie('csrftoken');
+            $.ajax({
+                url: '/delete_sensor_data/',
+                type: 'POST',
+                data: {
+                    ids: JSON.stringify(ids)
+                },
+                headers: {
+                    'X-CSRFToken': csrftoken
+                },
+                success: () => {
+                    alert('Selected images deleted successfully!');
+                    window.location.reload();
+                },
+                error: () => {
+                    alert('Failed to delete selected images!');
+                }
+            });
+        }
+
+        function saveBlockingArea(area) {
+            const csrftoken = getCookie('csrftoken');
+
+            $.ajax({
+                url: '/save_blocking_area/',
+                type: 'POST',
+                data: {
+                    x: area.x,
+                    y: area.y,
+                    width: area.width,
+                    height: area.height
+                },
+                headers: {
+                    'X-CSRFToken': csrftoken
+                },
+                success: () => {
+                    alert('Blocking area saved successfully!');
+                    window.location.reload();
+                },
+                error: () => {
+                    alert('Failed to save blocking area!');
+                }
+            });
+        }
+
+        function displayBlockList() {
+            const csrftoken = getCookie('csrftoken');
+            $.ajax({
+                url: '/get_block_data/',
+                type: 'GET',
+                dataType: 'json',
+                headers: {
+                    'X-CSRFToken': csrftoken
+                },
+                success: (data) => {
+                    const parsedData = JSON.parse(data);
+                    const imageList = document.getElementById('block-list');
+                    imageList.innerHTML = '';
+
+                    parsedData.forEach((item) => {
+                        const imageItem = document.createElement('div');
+                        imageItem.className = 'block-item';
+
+                        const name = document.createElement('p');
+                        name.textContent = `Number: ${item.pk}`;
+
+                        imageItem.appendChild(name);
+                        imageList.appendChild(imageItem);
+
+                        // Add this in the forEach loop inside the displayImageList function
+                        const checkbox = document.createElement('input');
+                        checkbox.type = 'checkbox';
+                        checkbox.className = 'block-checkbox';
+                        checkbox.value = item.pk;
+
+                        imageItem.appendChild(checkbox);
+
+                    });
+                },
+
+                error: () => {
+                    console.log('Failed to fetch sensor data.');
+                }
+            });
+        }
+        function deleteSelectedBlocks(ids) {
+            const csrftoken = getCookie('csrftoken');
+            $.ajax({
+                url: '/delete_block_data/',
+                type: 'POST',
+                data: {
+                    ids: JSON.stringify(ids)
+                },
+                headers: {
+                    'X-CSRFToken': csrftoken
+                },
+                success: () => {
+                    alert('Selected blocks deleted successfully!');
+                    window.location.reload();
+                },
+                error: () => {
+                    alert('Failed to delete selected blocks!');
+                }
+            });
+        }
+
+        
+        // Call the new function inside the change event listener
+        document.getElementById('object-name').addEventListener('change', () => {
+            const imageName = document.getElementById('image-name').value;
+            const objectName = document.getElementById('object-name').value;
+        });
+        
+
+        document.getElementById('delete-selected-btn').addEventListener('click', () => {
+            const checkboxes = document.getElementsByClassName('image-checkbox');
+            const selectedIds = [];
+
+            for (let checkbox of checkboxes) {
+                if (checkbox.checked) {
+                    selectedIds.push(checkbox.value);
+                }
+            }
+
+            if (selectedIds.length === 0) {
+                alert('Please select at least one image to delete.');
+                return;
+            }
+
+            deleteSelectedImages(selectedIds);
+        });
+
+        document.getElementById('delete-block-selected-btn').addEventListener('click', () => {
+            const checkboxes = document.getElementsByClassName('block-checkbox');
+            const selectedIds = [];
+
+            for (let checkbox of checkboxes) {
+                if (checkbox.checked) {
+                    selectedIds.push(checkbox.value);
+                }
+            }
+
+            if (selectedIds.length === 0) {
+                alert('Please select at least one block to delete.');
+                return;
+            }
+
+            deleteSelectedBlocks(selectedIds);
+        });
+
+        document.getElementById('blocking-btn').addEventListener('click', () => {
+            const video = document.getElementById('video');
+            context.drawImage(video, 0, 0, 480, 360);
+            initCropper(null);
+
+            document.getElementById('create-blocking-btn').style.display = 'inline-block';
+            document.getElementById('modify-btn').style.display = 'none';
+            document.getElementById('save-btn').style.display = 'none';
+        });
+
+        document.getElementById('create-blocking-btn').addEventListener('click', () => {
+            const cropData = cropper.getData();
+            const area = {
+                x: cropData.x,
+                y: cropData.y,
+                width: cropData.width,
+                height: cropData.height
+            };
+
+            saveBlockingArea(area);
+        });
+
+
+
+    </script>
+</body>
+</html>

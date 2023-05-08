@@ -21,5 +21,8 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     # path('', include('photo.urls')), #app 폴더 이름.urls
     # path('', include('detectme.urls')),
-    path('', include('cropping.urls')),
+    # path('', include('camerasensor.urls')),
+    # path('', include('cropping.urls')),
+    path('', include('camera_prototype.urls')),
+
 ]

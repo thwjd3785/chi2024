@@ -38,9 +38,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'photo', # 만든 앱 추가
-    'detectme',
-    'cropping',
+    'camera_prototype',
 ]
 
 MIDDLEWARE = [
