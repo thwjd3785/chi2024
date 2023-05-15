@@ -5,12 +5,14 @@ from . import views
 from django.conf.urls.static import static
 # settings에서 설정한 것들
 from django.conf import settings
+from django.contrib.auth.views import LogoutView
 
-app_name = 'camera_prototype'  # Add this line
+app_name = 'camera_prototype_v2'  # Add this line
 
 urlpatterns = [
     path('', views.index, name='index'),
     path('login/', views.user_login, name='login'),
+    path('logout/', views.user_logout, name='logout'),
     path('register/', views.user_register, name='register'),
     path('detectme/', views.detectme, name='detectme'),
     path('get_sensor_data/', views.get_sensor_data, name='get_sensor_data'),

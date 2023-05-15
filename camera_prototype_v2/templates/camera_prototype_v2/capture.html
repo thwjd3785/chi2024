@@ -1,5 +1,13 @@
 <!DOCTYPE html>
 <html>
+{% if user.is_authenticated %}
+    <p>Welcome, {{ user.username }}!</p>
+    <!-- Add a logout link -->
+    <a href="{% url 'camera_prototype_v2:logout' %}">Logout</a>
+{% else %}
+    <p>Please <a href="{% url 'camera_prototype_v2:login' %}">log in</a> to continue.</p>
+{% endif %}
+
 <head>
     <title>Webcam Image Cropper</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
@@ -179,7 +187,7 @@
                 <button id="capture-btn">센서 만들기</button>
                 <button id="blocking-btn">가릴 영역 만들기</button>
             </div>
-            <img id="video" src="{% url 'camera_prototype:detectme' %}" width="672" height="378" />
+            <img id="video" src="{% url 'camera_prototype_v2:detectme' %}" width="672" height="378" />
         </div>
         <div class="webcam-container">
             <h1>관찰 영역 설정</h1>
@@ -518,6 +526,11 @@
                             document.getElementById('object-name').value = objectName;
                             document.getElementById('modify-btn').style.display = 'inline-block';
                             document.getElementById('save-btn').style.display = 'none';
+
+                            // Set the value of the hidden input field to the clicked image's name
+                            const imageListName = item.fields.name;
+                            document.getElementById('past-image-name').value = imageListName;
+
 
                             // Re-crop the webcam image
                             const video = document.getElementById('video');

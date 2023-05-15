@@ -23,6 +23,5 @@ urlpatterns = [
     # path('', include('detectme.urls')),
     # path('', include('camerasensor.urls')),
     # path('', include('cropping.urls')),
-    path('', include('camera_prototype.urls')),
-
+    path('', include('camera_prototype_v2.urls', namespace='camera_prototype_v2')),
 ]

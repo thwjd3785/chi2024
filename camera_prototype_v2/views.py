@@ -28,12 +28,19 @@ def user_login(request):
             user = form.get_user()
             login(request, user)
             print("login try")
-            return redirect('camera_prototype:index')
+            return redirect('camera_prototype_v2:index')
         else:
             print("Form errors:", form.errors)
     else:
         form = AuthenticationForm()
-    return render(request, 'camera_prototype/login.html', {'form': form})
+    return render(request, 'camera_prototype_v2/login.html', {'form': form})
+
+from django.contrib.auth import logout
+from django.shortcuts import redirect
+
+def user_logout(request):
+    logout(request)
+    return redirect('camera_prototype_v2:login')
 
 from django.shortcuts import render, redirect
 from .forms import UserRegistrationForm
@@ -45,11 +52,33 @@ def user_register(request):
             user = form.save(commit=False)
             user.set_password(form.cleaned_data['password'])
             user.save()
-            return redirect('camera_prototype:login')
+            return redirect('camera_prototype_v2:login')
     else:
         form = UserRegistrationForm()
-    return render(request, 'camera_prototype/register.html', {'form': form})
+    return render(request, 'camera_prototype_v2/register.html', {'form': form})
 
+
+###
+from django.shortcuts import render, redirect
+from django.contrib.auth import authenticate, login
+from django.contrib.auth.forms import AuthenticationForm
+
+def login_view(request):
+    if request.method == 'POST':
+        form = AuthenticationForm(request, data=request.POST)
+        if form.is_valid():
+            username = form.cleaned_data.get('username')
+            password = form.cleaned_data.get('password')
+            user = authenticate(username=username, password=password)
+            if user is not None:
+                login(request, user)
+                return redirect('camera_prototype_v2:capture')
+            else:
+                # Handle case when authentication fails
+                pass
+    else:
+        form = AuthenticationForm()
+    return render(request, 'camera_prototype_v2/login.html', {'form': form})
 
 ###
 from django.shortcuts import render, get_object_or_404, redirect
@@ -70,19 +99,124 @@ webcam_height = 378
 
 # 객체 인식 class 읽어오기
 # Load class names
-with open('camera_prototype/coco.names', 'r') as f:
+with open('camera_prototype_v2/coco.names', 'r') as f:
     classes = [line.strip() for line in f.readlines()]
 
 model = torch.hub.load('ultralytics/yolov5', 'yolov5s', pretrained=True)
 colors = np.random.uniform(0, 255, size=(len(classes), 3))
 
+from django.contrib.auth.decorators import login_required
 # Create your views here.
+@login_required
 def home(request):
     # templates의 폴더명(즉 app의 폴더명/___.html)
-    return render(request, 'camera_prototype/capture.html')
+    return render(request, 'camera_prototype_v2/capture.html')
 
 # type: ignore[attr-defined]
 import mediapipe as mp
+from PIL import ImageFont, ImageDraw, Image
+
+font_path = "camera_prototype_v2/NanumGothic-Bold.ttf"
+
+def put_korean_text(image, text, position, font_path, font_size, color):
+    font = ImageFont.truetype(font_path, font_size)
+
+    # Reverse the color channels
+    reversed_color = (color[2], color[1], color[0])
+
+    img_pil = Image.fromarray(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
+    draw = ImageDraw.Draw(img_pil)
+    draw.text(position, text, font=font, fill=reversed_color)
+
+    return cv2.cvtColor(np.array(img_pil), cv2.COLOR_RGB2BGR)
+
+kor_to_eng_translations = {
+    '사람': 'person',
+    '자전거': 'bicycle',
+    '자동차': 'car',
+    '오토바이': 'motorbike',
+    '비행기': 'aeroplane',
+    '버스': 'bus',
+    '기차': 'train',
+    '트럭': 'truck',
+    '배': 'boat',
+    '신호등': 'traffic light',
+    '소화전': 'fire hydrant',
+    '정지 표시': 'stop sign',
+    '주차권 판매기': 'parking meter',
+    '벤치': 'bench',
+    '새': 'bird',
+    '고앙이': 'cat',
+    '개': 'dog',
+    '말': 'horse',
+    '양': 'sheep',
+    '소': 'cow',
+    '코끼리': 'elephant',
+    '곰': 'bear',
+    '얼룩말': 'zebra',
+    '기린': 'giraffe',
+    '백팩': 'backpack',
+    '우산': 'umbrella',
+    '핸드백': 'handbag',
+    '넥타이': 'tie',
+    '여행 가방': 'suitcase',
+    '원반': 'frisbee',
+    '스키': 'skis',
+    '스노보드': 'snowboard',
+    '공': 'sports ball',
+    '연': 'kite',
+    '야구 배트': 'baseball bat',
+    '야구 글러브': 'baseball glove',
+    '스케이트보드': 'skateboard',
+    '서핑보드': 'surfboard',
+    '테니스 라켓': 'tennis racket',
+    '병': 'bottle',
+    '와인잔': 'wine glass',
+    '컵': 'cup',
+    '포크': 'fork',
+    '칼': 'knife',
+    '숟가락': 'spoon',
+    '그릇': 'bowl',
+    '바나나': 'banana',
+    '사과': 'apple',
+    '샌드위치': 'sandwich',
+    '오렌지': 'orange',
+    '브로콜리': 'broccoli',
+    '당근': 'carrot',
+    '핫도그': 'hot dog',
+    '피자': 'pizza',
+    '도넛': 'donut',
+    '케이크': 'cake',
+    '의자': 'chair',
+    '쇼파': 'sofa',
+    '화분': 'pottedplant',
+    '침대': 'bed',
+    '식탁': 'diningtable',
+    '변기': 'toilet',
+    '티비': 'tvmonitor',
+    '노트북': 'laptop',
+    '마우스': 'mouse',
+    '리모컨': 'remote',
+    '키보드': 'keyboard',
+    '핸드폰': 'cell phone',
+    '전자레인지': 'microwave',
+    '오븐': 'oven',
+    '토스터': 'toaster',
+    '싱크대': 'sink',
+    '냉장고': 'refrigerator',
+    '책': 'book',
+    '시계': 'clock',
+    '꽃병': 'vase',
+    '가위': 'scissors',
+    '곰인형': 'teddy bear',
+    '드라이어': 'hair drier',
+    '칫솔': 'toothbrush',
+}
+
+def reverseTranslations(translations):
+    return {v: k for k, v in translations.items()}
+
+eng_to_kor_translations = reverseTranslations(kor_to_eng_translations)
 
 # 여기서부터 찐
 class VideoCamera(object):
@@ -147,27 +281,19 @@ class VideoCamera(object):
                 w = x_max - x_min
                 h = y_max - y_min
 
-                label = f"{classes[int(result[5].item())]}: {round(result[4].item(), 2) * 100}%"
+                english_object = classes[int(result[5].item())]
+                korean_object = eng_to_kor_translations.get(english_object, english_object)
+
+                label = f"{korean_object}: {round(result[4].item(), 2) * 100}%"
+
                 color = colors[int(result[5].item())]
+                int_color = (int(color[0]), int(color[1]), int(color[2]))
 
                 # 박스치고 텍스트 보여주기
-                cv2.rectangle(self.frame, (x_min, y_min), (x_max, y_max), color, 2)
-                cv2.putText(self.frame, label, (x_min, y_min + 30), cv2.FONT_HERSHEY_PLAIN, 2, color, 3)
+                cv2.rectangle(self.frame, (x_min, y_min), (x_max, y_max), int_color, 2)
+                # cv2.putText(self.frame, label, (x_min, y_min + 30), cv2.FONT_HERSHEY_PLAIN, 2, color, 3)
+                self.frame = put_korean_text(self.frame, label, (x_min+10, y_min+10), font_path, 32, int_color)
 
-            # 위에서 추가한 box 갯수만큼
-        for i in range(len(boxes)):
-                    # 박스 정보 다시 풀기
-            x, y, w, h = boxes[i]
-                    
-                    # label 값 보여줄려고
-            label = f"{classes[class_ids[i]]}: {class_probs[i]*100}%"
-                    # color도 입히자!
-            color = colors[class_ids[i]]
-                    
-                    # 박스치고 텍스트 보여주기
-            cv2.rectangle(self.frame, (x, y), (x + w, y + h), color, 2)
-            cv2.putText(self.frame, label, (x, y + 30), cv2.FONT_HERSHEY_PLAIN, 2, color, 3)
-            
         if self.sensors:
             for sensor in self.sensors:
                 x = int (sensor.x * 1280 / webcam_width)
@@ -179,7 +305,10 @@ class VideoCamera(object):
                 sensor_value = self.sensor_values.get(sensor.name, "OFF")  # Get the sensor value, default to "OFF"
                 color = (0, 255, 0) if sensor_value == "ON" else (0, 0, 255)  # Green if "ON", Red if "OFF"
                 cv2.rectangle(self.frame, (x, y), (x + w, y + h), color, 6)
-                cv2.putText(self.frame, sensor.name, (x, y + 30), cv2.FONT_HERSHEY_PLAIN, 2, color, 3)
+                # cv2.putText(self.frame, sensor.name, (x, y + 30), cv2.FONT_HERSHEY_PLAIN, 2, color, 3)
+                
+                self.frame = put_korean_text(self.frame, sensor.name, (x+10, y+10), font_path, 32, color)
+
         
         if self.blocks:
             for block in self.blocks:
@@ -222,10 +351,12 @@ def generate(camera):
             message = {
                 image_name: value
             }
-            ## send_mqtt_message("homeassistant/binary_sensor/sensorBedroom/state", message)
+            send_mqtt_message("homeassistant/binary_sensor/sensorBedroom/state", message)
 
         yield(b'--frame\r\n'
               b'Content-Type: image/jpeg\r\n\r\n' + jgp_byte_frame + b'\r\n\r\n')
+
+from django.http import HttpResponse
 
 @gzip.gzip_page
 def detectme(request):
@@ -236,7 +367,8 @@ def detectme(request):
         return StreamingHttpResponse(generate(cam), content_type='multipart/x-mixed-replace;boundary=frame')
     except:
         print("에러입니다...")
-        pass
+        return HttpResponse("Response from detectme")
+
 
 
 ###
@@ -281,12 +413,12 @@ def index(request):
             "value_template": "{{ value_json." + filename + " }}"
         }
 
-        ## send_mqtt_message("homeassistant/binary_sensor/sensorBedroom/{}/config".format(filename), messageCreateSensor)
+        send_mqtt_message("homeassistant/binary_sensor/sensorBedroom/{}/config".format(filename), messageCreateSensor)
 
         return JsonResponse({'success': True})
     
     context = {'form':form}
-    return render(request, 'camera_prototype/capture.html', context)
+    return render(request, 'camera_prototype_v2/capture.html', context)
 
 def send_mqtt_message(topic, message):
     # client = mqtt.Client()
@@ -373,17 +505,26 @@ def process_frame(frame, sensors, model, result_pose):
 
     return updated_values
 
-from django.http import JsonResponse
 from django.core import serializers
-from .models import CreateSensor
+from django.http import JsonResponse
+from django.contrib.auth.decorators import login_required
 
-def get_sensor_data(request):
-    data = serializers.serialize('json', CreateSensor.objects.filter(user=request.user))
-    return JsonResponse(data, safe=False, content_type='application/json')
-
+@login_required
 def get_block_data(request):
-    data = serializers.serialize('json', BlockingArea.objects.filter(user=request.user))
-    return JsonResponse(data, safe=False, content_type='application/json')
+    if request.user.is_authenticated:
+        data = serializers.serialize('json', BlockingArea.objects.filter(user=request.user))
+    else:
+        data = serializers.serialize('json', [])
+    return JsonResponse(data, safe=False)
+
+@login_required
+def get_sensor_data(request):
+    if request.user.is_authenticated:
+        data = serializers.serialize('json', CreateSensor.objects.filter(user=request.user))
+    else:
+        data = serializers.serialize('json', [])
+    return JsonResponse(data, safe=False)
+
 
 from django.shortcuts import render
 from django.http import JsonResponse
@@ -406,6 +547,7 @@ def update_sensor_data(request):
 
         try:
             sensor_data = CreateSensor.objects.get(pk=sensor_id, user=request.user)
+            past_image_name = sensor_data.name
             sensor_data.name = name
             sensor_data.object_name = object_name
 
@@ -424,6 +566,25 @@ def update_sensor_data(request):
             sensor_data.h = h
 
             sensor_data.save()
+
+            messageCreateSensor = {
+                "device_class": "motion",
+                "name": name,
+                "object_id": name,
+                "unique_id": name,
+                "device": {
+                    "identifiers": "123",
+                    "name": "testDevice",
+                    "manufacturer": "VarOfLa",
+                    "configuration_url": "https://blog.naver.com/dhksrl0508"
+                },
+                "state_topic": "homeassistant/binary_sensor/sensorBedroom/state",
+                "unit_of_measurement": "%",
+                "value_template": "{{ value_json." + name + " }}"
+            }
+
+            send_mqtt_message("homeassistant/binary_sensor/sensorBedroom/{}/config".format(past_image_name), messageCreateSensor)
+
 
             return JsonResponse({'status': 'success'})
         except CreateSensor.DoesNotExist:

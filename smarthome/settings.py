@@ -28,6 +28,7 @@ DEBUG = True
 
 ALLOWED_HOSTS = []
 
+LOGIN_URL = 'camera_prototype_v2:login'  # Replace this with your actual login view name
 
 # Application definition
 
@@ -38,7 +39,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'camera_prototype',
+    'camera_prototype_v2',
 ]
 
 MIDDLEWARE = [
