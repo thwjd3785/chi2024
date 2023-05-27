@@ -22,6 +22,9 @@ urlpatterns = [
     path('delete_block_data/', views.delete_block_data, name='delete_block_data'),
 
     path('get_block_data/', views.get_block_data, name='get_block_data'),
+
+    path('stop_camera/', views.stop_camera, name='stop_camera'),
+
 ]
 
 

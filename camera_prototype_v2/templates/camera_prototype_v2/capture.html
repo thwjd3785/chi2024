@@ -8,7 +8,14 @@
     <p>Please <a href="{% url 'camera_prototype_v2:login' %}">log in</a> to continue.</p>
 {% endif %}
 
+
 <head>
+    
+    <div class="controls">
+        <button id="toggle-camera-btn">Toggle Camera</button>
+    </div>
+     
+
     <title>Webcam Image Cropper</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.12/cropper.min.js"></script>
@@ -318,6 +325,9 @@
         };
         let eng_to_kor_translations = reverseTranslations(kor_to_eng_translations);
 
+        document.getElementById("toggle-camera-btn").addEventListener("click", function () {
+            toggleCamera();
+        });
 
         capBtn.addEventListener('click', () => {
             const video = document.getElementById('video');
@@ -434,6 +444,29 @@
             return cookieValue;
         }
 
+        let cameraVisible = true;
+
+        let cameraOn = true;
+
+        function toggleCamera() {
+            let videoElement = document.getElementById("video");
+
+            if (cameraOn) {
+                // Stop the video stream
+                fetch("{% url 'camera_prototype_v2:stop_camera' %}")
+                    .then(() => {
+                        videoElement.setAttribute("src", "");
+                        cameraOn = false;
+                    })
+                    .catch(console.error);
+            } else {
+                // Start the video stream
+                videoElement.setAttribute("src", "{% url 'camera_prototype_v2:detectme' %}");
+                cameraOn = true;
+            }
+        }
+
+
         function initCropper(cropBoxData, position) {
             if (cropper) {
                 cropper.destroy();
@@ -526,11 +559,6 @@
                             document.getElementById('object-name').value = objectName;
                             document.getElementById('modify-btn').style.display = 'inline-block';
                             document.getElementById('save-btn').style.display = 'none';
-
-                            // Set the value of the hidden input field to the clicked image's name
-                            const imageListName = item.fields.name;
-                            document.getElementById('past-image-name').value = imageListName;
-
 
                             // Re-crop the webcam image
                             const video = document.getElementById('video');

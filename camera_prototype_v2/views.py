@@ -94,7 +94,7 @@ import torch
 import numpy as np
 from threading import Lock
 
-webcam_width = 640
+webcam_width = 672
 webcam_height = 378
 
 # 객체 인식 class 읽어오기
@@ -211,6 +211,39 @@ kor_to_eng_translations = {
     '곰인형': 'teddy bear',
     '드라이어': 'hair drier',
     '칫솔': 'toothbrush',
+    '코': 'NOSE',
+    '왼쪽 눈 내부': 'LEFT_EYE_INNER',
+    '왼쪽 눈': 'LEFT_EYE',
+    '왼쪽  눈 외부': 'LEFT_EYE_OUTER',
+    '오른쪽 눈 내부': 'RIGHT_EYE_INNER',
+    '오른쪽 눈': 'RIGHT_EYE',
+    '오른쪽 눈 외부': 'RIGHT_EYE_OUTER',
+    '왼쪽 귀': 'LEFT_EAR',
+    '오른쪽 귀': 'RIGHT_EAR',
+    '왼쪽 입': 'MOUTH_LEFT',
+    '오른쪽 입': 'MOUTH_RIGHT',
+    '왼쪽 어깨': 'LEFT_SHOULDER',
+    '오른쪽 어깨': 'RIGHT_SHOULDER',
+    '왼쪽 팔꿈치': 'LEFT_ELBOW',
+    '오른쪽 팔꿈치': 'RIGHT_ELBOW',
+    '왼쪽 손목': 'LEFT_WRIST',
+    '오른쪽 손목': 'RIGHT_WRIST',
+    '왼쪽 새끼손가락': 'LEFT_PINKY',
+    '오른쪽 새끼손가락': 'RIGHT_PINKY',
+    '왼쪽 검지손가락': 'LEFT_INDEX',
+    '오른쪽 검지손가락': 'RIGHT_INDEX',
+    '왼쪽 엄지손가락': 'LEFT_THUMB',
+    '오른쪽 엄지손가락': 'RIGHT_THUMB',
+    '왼쪽 엉덩이': 'LEFT_HIP',
+    '오른쪽 엉덩이': 'RIGHT_HIP',
+    '왼쪽 무릎': 'LEFT_KNEE',
+    '오른쪽 무릎': 'RIGHT_KNEE',
+    '왼쪽 발목': 'LEFT_ANKLE',
+    '오른쪽 발목': 'RIGHT_ANKLE',
+    '왼쪽 발뒤꿈치': 'LEFT_HEEL',
+    '오른쪽 발뒤꿈치': 'RIGHT_HEEL',
+    '왼쪽 검지발가락': 'LEFT_FOOT_INDEX',
+    '오른쪽 검지발가락': 'RIGHT_FOOT_INDEX',
 }
 
 def reverseTranslations(translations):
@@ -236,10 +269,18 @@ class VideoCamera(object):
         self.mp_pose = mp.solutions.pose
         self.pose = self.mp_pose.Pose()
         
+        self.running = True
         # 동시작업을 하기 위해
-        threading.Thread(target=self.update, args=()).start()
-    
+        self.thread_stop_event = threading.Event()  # Add this line
+        self.thread = threading.Thread(target=self.update, args=())
+        self.thread.start()
+
     def __del__(self):
+        self.stop()
+    
+    def stop(self):
+        self.thread_stop_event.set()  # Signal the thread to stop
+        self.thread.join()  # Wait for the thread to finish
         self.video.release()
     
     def get_frame(self):
@@ -296,10 +337,10 @@ class VideoCamera(object):
 
         if self.sensors:
             for sensor in self.sensors:
-                x = int (sensor.x * 1280 / webcam_width)
-                y = int (sensor.y * 720 / webcam_height)
-                w = int (sensor.w * 1280 / webcam_width)
-                h = int (sensor.h * 720 / webcam_height)
+                x = int (sensor.x * 1920 / webcam_width)
+                y = int (sensor.y * 1080 / webcam_height)
+                w = int (sensor.w * 1920 / webcam_width)
+                h = int (sensor.h * 1080 / webcam_height)
                 # w = int (sensor.w)
                 # h = int (sensor.h)
                 sensor_value = self.sensor_values.get(sensor.name, "OFF")  # Get the sensor value, default to "OFF"
@@ -312,10 +353,10 @@ class VideoCamera(object):
         
         if self.blocks:
             for block in self.blocks:
-                x = int (block.x * 1280 / webcam_width)
-                y = int (block.y * 720 / webcam_height)
-                w = int (block.width * 1280 / webcam_width)
-                h = int (block.height * 720 / webcam_height)
+                x = int (block.x * 1920 / webcam_width)
+                y = int (block.y * 1080 / webcam_height)
+                w = int (block.width * 1920 / webcam_width)
+                h = int (block.height * 1080 / webcam_height)
                 cv2.rectangle(self.frame, (x, y), (x + w, y + h), (0,0,0), -1)
                 cv2.putText(self.frame, str(block.pk), (x + 10, y + 30), cv2.FONT_HERSHEY_PLAIN, 2, (255,255,255), 2)
 
@@ -330,10 +371,13 @@ class VideoCamera(object):
         return jpeg.tobytes() # bytes 파일로 바꿔준다.
     
     def update(self):
-        while True:
-            _, frame = self.video.read()
-            with self.lock:  # Ensure thread safety while updating the frame
-                self.frame = frame
+        while not self.thread_stop_event.is_set():
+            if self.video.isOpened():
+                _, frame = self.video.read()
+                with self.lock:  # Ensure thread safety while updating the frame
+                    self.frame = frame
+            else:
+                break
     
 
 def generate(camera):
@@ -351,15 +395,32 @@ def generate(camera):
             message = {
                 image_name: value
             }
-            send_mqtt_message("homeassistant/binary_sensor/sensorBedroom/state", message)
+            # send_mqtt_message("homeassistant/binary_sensor/sensorBedroom/state", message)
 
         yield(b'--frame\r\n'
               b'Content-Type: image/jpeg\r\n\r\n' + jgp_byte_frame + b'\r\n\r\n')
 
 from django.http import HttpResponse
 
+video_camera = None
+
+
+def stop_camera(request):
+    global video_camera
+    if video_camera is not None:
+        video_camera.stop()
+        del video_camera
+        video_camera = None
+        return JsonResponse({"status": "success"})
+    else:
+        return HttpResponse("Camera is not running")
+    
+
 @gzip.gzip_page
 def detectme(request):
+    # Store the referrer URL in session
+    request.session['previous_page'] = request.META.get('HTTP_REFERER')
+    
     try:
         sensors = CreateSensor.objects.filter(user=request.user)
         blocks = BlockingArea.objects.filter(user=request.user)
@@ -368,6 +429,7 @@ def detectme(request):
     except:
         print("에러입니다...")
         return HttpResponse("Response from detectme")
+
 
 
 
@@ -413,7 +475,7 @@ def index(request):
             "value_template": "{{ value_json." + filename + " }}"
         }
 
-        send_mqtt_message("homeassistant/binary_sensor/sensorBedroom/{}/config".format(filename), messageCreateSensor)
+        # send_mqtt_message("homeassistant/binary_sensor/sensorBedroom/{}/config".format(filename), messageCreateSensor)
 
         return JsonResponse({'success': True})
     
@@ -475,10 +537,10 @@ def process_frame(frame, sensors, model, result_pose):
             detected_object = classes[int(result[5].item())].lower()
             if detected_object == object_name:
                 x_min, y_min, x_max, y_max = result[:4].tolist()
-                x_min = x_min * webcam_width / 1280
-                x_max = x_max * webcam_width / 1280
-                y_min = y_min * webcam_height / 720
-                y_max = y_max * webcam_height / 720
+                x_min = x_min * webcam_width / 1920
+                x_max = x_max * webcam_width / 1920
+                y_min = y_min * webcam_height / 1080
+                y_max = y_max * webcam_height / 1080
 
                 if (x_min >= area[0] and y_min >= area[1] and x_max <= area[0] + area[2] and y_max <= area[1] + area[3]):
                     consecutive_detection_counter[sensor.name] += 1
@@ -583,7 +645,7 @@ def update_sensor_data(request):
                 "value_template": "{{ value_json." + name + " }}"
             }
 
-            send_mqtt_message("homeassistant/binary_sensor/sensorBedroom/{}/config".format(past_image_name), messageCreateSensor)
+            # send_mqtt_message("homeassistant/binary_sensor/sensorBedroom/{}/config".format(past_image_name), messageCreateSensor)
 
 
             return JsonResponse({'status': 'success'})
