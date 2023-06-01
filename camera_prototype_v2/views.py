@@ -94,8 +94,8 @@ import torch
 import numpy as np
 from threading import Lock
 
-webcam_width = 672
-webcam_height = 378
+webcam_width = 1008
+webcam_height = 567
 
 # 객체 인식 class 읽어오기
 # Load class names
@@ -404,28 +404,40 @@ from django.http import HttpResponse
 
 video_camera = None
 
-
+def start_camera(request):
+    global video_camera
+    if 'video_camera' not in request.session or request.session['video_camera'] is None:
+        sensors = CreateSensor.objects.filter(user=request.user)
+        blocks = BlockingArea.objects.filter(user=request.user)
+        video_camera = VideoCamera(sensors, blocks)
+        request.session['video_camera'] = video_camera
+        return JsonResponse({"status": "success", "camera_state": True})
+    else:
+        return JsonResponse({"status": "failure", "camera_state": False})
+    
 def stop_camera(request):
     global video_camera
     if video_camera is not None:
         video_camera.stop()
         del video_camera
         video_camera = None
-        return JsonResponse({"status": "success"})
+        print("delete!")
+        return JsonResponse({"status": "success", "camera_state": False})
     else:
-        return HttpResponse("Camera is not running")
-    
+        return JsonResponse({"status": "failure", "camera_state": True})
 
 @gzip.gzip_page
 def detectme(request):
+    global video_camera
     # Store the referrer URL in session
     request.session['previous_page'] = request.META.get('HTTP_REFERER')
     
     try:
         sensors = CreateSensor.objects.filter(user=request.user)
         blocks = BlockingArea.objects.filter(user=request.user)
-        cam = VideoCamera(sensors, blocks)
-        return StreamingHttpResponse(generate(cam), content_type='multipart/x-mixed-replace;boundary=frame')
+        video_camera = VideoCamera(sensors, blocks)
+        print("activate!")
+        return StreamingHttpResponse(generate(video_camera), content_type='multipart/x-mixed-replace;boundary=frame')
     except:
         print("에러입니다...")
         return HttpResponse("Response from detectme")
@@ -550,6 +562,12 @@ def process_frame(frame, sensors, model, result_pose):
 
         if not detected and result_pose.pose_landmarks and object_name.upper() in mp.solutions.pose.PoseLandmark.__members__:
             x, y = get_mediapipe_landmark_coordinates(object_name.upper(), landmarks)
+            # 새로 추가함
+            # x = x * webcam_width / 1920
+            # y = y * webcam_height / 1080
+            ### 일단 잘 안됨. 대전가서 해보기.
+            # print(x,y)
+            # print(area[0],area[1],area[0] + area[2],area[1] + area[3])
             if (x >= area[0] and y >= area[1] and x <= area[0] + area[2] and y <= area[1] + area[3]):
                 consecutive_detection_counter[sensor.name] += 1
                 consecutive_non_detection_counter[sensor.name] = 0

@@ -23,8 +23,9 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.2/mqttws31.min.js"></script>
     <style>
         .container {
-            display: flex;
+            display: relative;
             justify-content: space-around;
+            padding: 20px;
         }
         .webcam-container {
             position: relative;
@@ -36,7 +37,7 @@
             padding: 20px;
         }
         .controls {
-            display: flex;
+            display: fixed;
             justify-content: space-between;
             align-items: center;
             margin-bottom: 20px;
@@ -66,8 +67,8 @@
         }
 
         #canvas-wrapper {
-            width: 672px;
-            height: 378px;
+            width: 1008px;
+            height: 567px;
             overflow: hidden;
             position: relative;
         }
@@ -183,20 +184,30 @@
             transition: all 0.3s ease; /* Smooth transition for hover effects */
         }
 
+        #image-name {
+            width: 150px;   /* or any width you want */
+            height: 15px;   /* or any height you want */
+        }
+        #object-name {
+            width: 220px;   /* or any width you want */
+            height: 15px;   /* or any height you want */
+        }
+
+
 
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="webcam-container">
+    <div class="container" style="display: inline-flex;">
+        <div class="webcam-container" id="webcam-container-1">
             <h1>우리집 카메라 화면</h1>
             <div class="controls">
-                <button id="capture-btn">센서 만들기</button>
-                <button id="blocking-btn">가릴 영역 만들기</button>
+                <button id="capture-btn" onclick="showContainer2()">센서 만들기</button>
+                <button id="blocking-btn" onclick="showContainer2()">가릴 영역 만들기</button>
             </div>
-            <img id="video" src="{% url 'camera_prototype_v2:detectme' %}" width="672" height="378" />
+            <img id="video" src="{% url 'camera_prototype_v2:stop_camera' %}" width="1008" height="567" />
         </div>
-        <div class="webcam-container">
+        <div class="webcam-container" id="webcam-container-2" style="display: none;">
             <h1>관찰 영역 설정</h1>
             <div class="controls">
                 <div id="inputs-container" class="inputs-container" style="display: none;">
@@ -213,8 +224,13 @@
             <input type="hidden" id="h" name="h">
 
             <div id="canvas-wrapper">
-                <canvas id="canvas" width="672" height="378"></canvas>
+                <canvas id="canvas" width="1008" height="567"></canvas>
             </div>
+        </div>
+        <div class="webcam-container" id="references" style="margin-left: 20px; display:static;">
+            <h1>참고 자료</h1>
+            <a href="/media/body_elements.pdf">사람 신체 위치 안내 자료</a>
+            <a href="http://homeassistant.local:8123">홈어시스턴트 링크</a>
         </div>
     </div>
     <div class="section">
@@ -237,8 +253,8 @@
         let cropper;
         let sensorID;
 
-        let webcam_width = 672
-        let webcam_height = 378
+        let webcam_width = 1008
+        let webcam_height = 567
 
         let kor_to_eng_translations = {
             '사람': 'person',
@@ -322,8 +338,46 @@
             '드라이어': 'hair drier',
             '칫솔': 'toothbrush',
             // Add more translations here, e.g., '한글_객체명': 'English_object_name'
+            '코': 'NOSE',
+            '왼쪽 눈 내부': 'LEFT_EYE_INNER',
+            '왼쪽 눈': 'LEFT_EYE',
+            '왼쪽  눈 외부': 'LEFT_EYE_OUTER',
+            '오른쪽 눈 내부': 'RIGHT_EYE_INNER',
+            '오른쪽 눈': 'RIGHT_EYE',
+            '오른쪽 눈 외부': 'RIGHT_EYE_OUTER',
+            '왼쪽 귀': 'LEFT_EAR',
+            '오른쪽 귀': 'RIGHT_EAR',
+            '왼쪽 입': 'MOUTH_LEFT',
+            '오른쪽 입': 'MOUTH_RIGHT',
+            '왼쪽 어깨': 'LEFT_SHOULDER',
+            '오른쪽 어깨': 'RIGHT_SHOULDER',
+            '왼쪽 팔꿈치': 'LEFT_ELBOW',
+            '오른쪽 팔꿈치': 'RIGHT_ELBOW',
+            '왼쪽 손목': 'LEFT_WRIST',
+            '오른쪽 손목': 'RIGHT_WRIST',
+            '왼쪽 새끼손가락': 'LEFT_PINKY',
+            '오른쪽 새끼손가락': 'RIGHT_PINKY',
+            '왼쪽 검지손가락': 'LEFT_INDEX',
+            '오른쪽 검지손가락': 'RIGHT_INDEX',
+            '왼쪽 엄지손가락': 'LEFT_THUMB',
+            '오른쪽 엄지손가락': 'RIGHT_THUMB',
+            '왼쪽 엉덩이': 'LEFT_HIP',
+            '오른쪽 엉덩이': 'RIGHT_HIP',
+            '왼쪽 무릎': 'LEFT_KNEE',
+            '오른쪽 무릎': 'RIGHT_KNEE',
+            '왼쪽 발목': 'LEFT_ANKLE',
+            '오른쪽 발목': 'RIGHT_ANKLE',
+            '왼쪽 발뒤꿈치': 'LEFT_HEEL',
+            '오른쪽 발뒤꿈치': 'RIGHT_HEEL',
+            '왼쪽 검지발가락': 'LEFT_FOOT_INDEX',
+            '오른쪽 검지발가락': 'RIGHT_FOOT_INDEX',
         };
         let eng_to_kor_translations = reverseTranslations(kor_to_eng_translations);
+        let cameraOn = true;
+
+        displayImageList();
+        displayBlockList();
+        toggleCamera();
 
         document.getElementById("toggle-camera-btn").addEventListener("click", function () {
             toggleCamera();
@@ -336,8 +390,8 @@
             initCropper(null);
             // Save the cropped image to the img element
             // document.getElementById('image').src = cropper.getCroppedCanvas().toDataURL();
-            document.getElementById('inputs-container').style.display = 'flex';
-            document.getElementById('save-btn').style.display = 'flex';
+            document.getElementById('inputs-container').style.display = 'inline-block';
+            document.getElementById('save-btn').style.display = 'inline-block';
         });
 
         // Save the cropped image to the server
@@ -346,7 +400,18 @@
             //const dataUrl = document.getElementById('image').src;
             const imageName = document.getElementById('image-name').value;
             const objectNameInput = document.getElementById('object-name').value;
-            objectName = kor_to_eng_translations[objectNameInput] || objectNameInput;
+
+            let normalized_translations = {};
+
+            for(let key in kor_to_eng_translations){
+                normalized_translations[key.replace(/ /g, '')] = kor_to_eng_translations[key];
+            }
+
+            let normalizedObjectNameInput = objectNameInput.replace(/ /g, '');
+            objectName = normalized_translations[normalizedObjectNameInput] || objectNameInput;
+
+            // objectName = kor_to_eng_translations[objectNameInput] || objectNameInput;
+
             const cropData = cropper.getData();
             const area = [cropData.x, cropData.y, cropData.width, cropData.height];
             cropper.getCroppedCanvas().toBlob((blob) => {
@@ -383,14 +448,23 @@
             });
             displayImageList();
             displayBlockList();
+            showContainer1();
         });     
-        displayImageList();
-        displayBlockList();
         
         document.getElementById('modify-btn').addEventListener('click', () => {
             const imageName = document.getElementById('image-name').value;
             const objectNameInput = document.getElementById('object-name').value;
-            objectName = kor_to_eng_translations[objectNameInput] || objectNameInput; 
+
+            let normalized_translations = {};
+
+            for(let key in kor_to_eng_translations){
+                normalized_translations[key.replace(/ /g, '')] = kor_to_eng_translations[key];
+            }
+
+            let normalizedObjectNameInput = objectNameInput.replace(/ /g, '');
+            objectName = normalized_translations[normalizedObjectNameInput] || objectNameInput;
+
+            // objectName = kor_to_eng_translations[objectNameInput] || objectNameInput; 
 
             const cropData = cropper.getData();
             const area = [cropData.x, cropData.y, cropData.width, cropData.height];
@@ -444,25 +518,21 @@
             return cookieValue;
         }
 
-        let cameraVisible = true;
-
-        let cameraOn = true;
-
         function toggleCamera() {
             let videoElement = document.getElementById("video");
 
             if (cameraOn) {
                 // Stop the video stream
+                videoElement.setAttribute("src", "{% url 'camera_prototype_v2:detectme' %}");
+                cameraOn = false;
+            } else {
+                // Start the video stream
                 fetch("{% url 'camera_prototype_v2:stop_camera' %}")
                     .then(() => {
                         videoElement.setAttribute("src", "");
-                        cameraOn = false;
+                        cameraOn = true;
                     })
                     .catch(console.error);
-            } else {
-                // Start the video stream
-                videoElement.setAttribute("src", "{% url 'camera_prototype_v2:detectme' %}");
-                cameraOn = true;
             }
         }
 
@@ -543,7 +613,17 @@
 
                         const objectNameList = document.createElement('p');
                         const objectNameInput = item.fields.object_name
-                        const objectName = eng_to_kor_translations[objectNameInput] || objectNameInput;
+
+                        let normalized_translations_eng_to_kor = {};
+
+                        for(let key in eng_to_kor_translations){
+                            normalized_translations_eng_to_kor[key.replace(/ /g, '')] = eng_to_kor_translations[key];
+                        }
+
+                        let normalizedObjectNameInput_reverse = objectNameInput.replace(/ /g, '');
+                        const objectName = normalized_translations_eng_to_kor[normalizedObjectNameInput_reverse] || objectNameInput;
+
+                        // const objectName = eng_to_kor_translations[objectNameInput] || objectNameInput;
                         objectNameList.textContent = `객체: ${objectName}`;
 
                         imageItem.appendChild(image);
@@ -552,10 +632,21 @@
 
                         // Add click event listener to the image item
                         imageItem.addEventListener('click', () => {
+                            showContainer2();
                             sensorID = item.pk
                             document.getElementById('image-name').value = item.fields.name;
                             const objectNameInput = item.fields.object_name
-                            const objectName = eng_to_kor_translations[objectNameInput] || objectNameInput;
+
+                            let normalized_translations_eng_to_kor = {};
+
+                            for(let key in eng_to_kor_translations){
+                                normalized_translations_eng_to_kor[key.replace(/ /g, '')] = eng_to_kor_translations[key];
+                            }
+
+                            let normalizedObjectNameInput_reverse = objectNameInput.replace(/ /g, '');
+                            const objectName = normalized_translations_eng_to_kor[normalizedObjectNameInput_reverse] || objectNameInput;
+
+                            // const objectName = eng_to_kor_translations[objectNameInput] || objectNameInput;
                             document.getElementById('object-name').value = objectName;
                             document.getElementById('modify-btn').style.display = 'inline-block';
                             document.getElementById('save-btn').style.display = 'none';
@@ -573,7 +664,7 @@
                                 x: item.fields.x,
                                 y: item.fields.y,
                             });
-                            document.getElementById('inputs-container').style.display = 'flex';
+                            document.getElementById('inputs-container').style.display = 'inline-block';
                         });
 
                         imageList.appendChild(imageItem);
@@ -702,6 +793,17 @@
                 }
             });
         }
+
+        function showContainer1() {
+            document.getElementById('webcam-container-1').style.display = 'block';
+            document.getElementById('webcam-container-2').style.display = 'none';
+        }
+
+        function showContainer2() {
+            document.getElementById('webcam-container-1').style.display = 'none';
+            document.getElementById('webcam-container-2').style.display = 'block';
+        }
+
 
         
         // Call the new function inside the change event listener
