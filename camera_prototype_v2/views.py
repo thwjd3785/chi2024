@@ -102,7 +102,9 @@ webcam_height = 567
 with open('camera_prototype_v2/coco.names', 'r') as f:
     classes = [line.strip() for line in f.readlines()]
 
-model = torch.hub.load('ultralytics/yolov5', 'yolov5s', pretrained=True)
+#model = torch.hub.load('ultralytics/yolov5', 'yolov5s', pretrained=True)
+from ultralytics import YOLO
+model = YOLO('yolov8n.pt')
 colors = np.random.uniform(0, 255, size=(len(classes), 3))
 
 from django.contrib.auth.decorators import login_required
@@ -214,7 +216,7 @@ kor_to_eng_translations = {
     '코': 'NOSE',
     '왼쪽 눈 내부': 'LEFT_EYE_INNER',
     '왼쪽 눈': 'LEFT_EYE',
-    '왼쪽  눈 외부': 'LEFT_EYE_OUTER',
+    '왼쪽 눈 외부': 'LEFT_EYE_OUTER',
     '오른쪽 눈 내부': 'RIGHT_EYE_INNER',
     '오른쪽 눈': 'RIGHT_EYE',
     '오른쪽 눈 외부': 'RIGHT_EYE_OUTER',
@@ -308,26 +310,26 @@ class VideoCamera(object):
         #image = self.frame
         # frameRGB = self.frame[..., ::-1] #BGR -> RGB
         #results = model(frameRGB)
-        for result in results_yolo.xyxy[0]:
+        for result in results_yolo[0].boxes:
 
-            if result[4].item() > 0.5:
-                x_min = int(result[0].item()) # box의 x 최소값
-                x_max = int(result[2].item()) # box의 x 최댓값
+            if result.conf.item() > 0.5:
+                x_min = int(result.xyxy[0][0].item()) # box의 x 최소값
+                x_max = int(result.xyxy[0][2].item()) # box의 x 최댓값
 
-                y_min = int(result[1].item()) # box의 y 최소값
-                y_max = int(result[3].item()) # box의 y 최댓값
+                y_min = int(result.xyxy[0][1].item()) # box의 y 최소값
+                y_max = int(result.xyxy[0][3].item()) # box의 y 최댓값
 
                 # Visualization
                 # box 너비, 높이 구해서 정보 저장
                 w = x_max - x_min
                 h = y_max - y_min
 
-                english_object = classes[int(result[5].item())]
+                english_object = classes[int(result.cls.item())]
                 korean_object = eng_to_kor_translations.get(english_object, english_object)
 
-                label = f"{korean_object}: {round(result[4].item(), 2) * 100}%"
+                label = f"{korean_object}: {round(result.conf.item(), 2) * 100}%"
 
-                color = colors[int(result[5].item())]
+                color = colors[int(result.cls.item())]
                 int_color = (int(color[0]), int(color[1]), int(color[2]))
 
                 # 박스치고 텍스트 보여주기
@@ -545,10 +547,14 @@ def process_frame(frame, sensors, model, result_pose):
         detected = False
 
         # Check if the specified object is within the cropped area
-        for result in results_yolo.xyxy[0]:
-            detected_object = classes[int(result[5].item())].lower()
+        for result in results_yolo[0].boxes:
+            detected_object = classes[int(result.cls.item())].lower()
             if detected_object == object_name:
-                x_min, y_min, x_max, y_max = result[:4].tolist()
+                x_min = int(result.xyxy[0][0].item()) # box의 x 최소값
+                x_max = int(result.xyxy[0][2].item()) # box의 x 최댓값
+
+                y_min = int(result.xyxy[0][1].item()) # box의 y 최소값
+                y_max = int(result.xyxy[0][3].item()) # box의 y 최댓값
                 x_min = x_min * webcam_width / 1920
                 x_max = x_max * webcam_width / 1920
                 y_min = y_min * webcam_height / 1080
