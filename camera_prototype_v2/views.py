@@ -257,6 +257,15 @@ eng_to_kor_translations = reverseTranslations(kor_to_eng_translations)
 class VideoCamera(object):
     def __init__(self, sensors=None, blocks=None):
         self.video = cv2.VideoCapture(0)
+        print(int(self.video.get(cv2.CAP_PROP_FRAME_HEIGHT)))
+        print(int(self.video.get(cv2.CAP_PROP_FRAME_WIDTH)))
+        print(int(self.video.get(cv2.CAP_PROP_FPS)))
+        '''윈도우로 할 때 추가하기
+        self.video = cv2.VideoCapture(1,cv2.CAP_DSHOW)
+        self.video.set(cv2.CAP_PROP_FRAME_WIDTH,1920)
+        self.video.set(cv2.CAP_PROP_FRAME_HEIGHT,1080)
+        
+        '''
         _, self.frame = self.video.read()
         self.lock = Lock()
         self.sensors = sensors or []
